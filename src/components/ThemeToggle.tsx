@@ -4,8 +4,9 @@ import { useTheme } from "next-themes";
 import { Moon, Sun } from "lucide-react";
 
 /**
- * Light/dark toggle. Both icons are rendered and CSS decides which one shows,
- * so the markup is identical on the server and the client (no hydration flash).
+ * Pill switch styled after the Keploy DevRel header toggle:
+ * orange track with a sun in light mode, navy track with a moon in dark mode.
+ * Both states are in the markup and CSS picks one, so server and client render the same.
  */
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -13,12 +14,16 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={resolvedTheme === "dark"}
       aria-label="Toggle dark mode"
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition hover:text-foreground hover:border-accent/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+      className="relative inline-flex h-8 w-14 shrink-0 items-center rounded-full bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 dark:bg-[#333d59]"
     >
-      <Sun className="hidden h-4 w-4 dark:block" />
-      <Moon className="h-4 w-4 dark:hidden" />
+      <span className="absolute left-1 flex h-6 w-6 items-center justify-center rounded-full bg-white text-accent shadow transition-transform dark:translate-x-6 dark:bg-[#02011b] dark:text-white">
+        <Sun className="h-3.5 w-3.5 dark:hidden" />
+        <Moon className="hidden h-3.5 w-3.5 dark:block" />
+      </span>
     </button>
   );
 }

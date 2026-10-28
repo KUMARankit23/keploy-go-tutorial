@@ -4,6 +4,7 @@ import createMDX from "@next/mdx";
 const nextConfig: NextConfig = {
   // The whole site is one prerendered page, so emit plain static files.
   output: "export",
+  images: { unoptimized: true },
   pageExtensions: ["js", "jsx", "ts", "tsx", "md", "mdx"],
   turbopack: {
     rules: {

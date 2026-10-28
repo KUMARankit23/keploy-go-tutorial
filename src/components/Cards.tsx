@@ -29,9 +29,13 @@ export function Cards({ children }: { children: ReactNode }) {
 export function Card({ title, icon, children }: { title: string; icon?: keyof typeof icons; children: ReactNode }) {
   const Icon = icon ? icons[icon] : undefined;
   return (
-    <div className="rounded-xl border border-border bg-card p-4 transition hover:border-accent/50">
-      <p className="mb-1 flex items-center gap-2 font-semibold">
-        {Icon && <Icon className="h-4 w-4 shrink-0 text-accent" aria-hidden />}
+    <div className="brand-card p-5 transition hover:-translate-y-0.5">
+      <p className="mb-2 flex items-center gap-2.5 font-bold text-navy">
+        {Icon && (
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-accent-soft text-accent">
+            <Icon className="h-4 w-4" aria-hidden />
+          </span>
+        )}
         {title}
       </p>
       <div className="text-sm leading-6 text-muted-foreground [&_code]:text-[0.85em]">{children}</div>

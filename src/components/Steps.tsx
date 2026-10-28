@@ -3,7 +3,7 @@ import { slugify } from "@/content/toc";
 
 export function Steps({ children }: { children: ReactNode }) {
   return (
-    <ol className="not-prose my-8 ml-0 list-none space-y-0 border-l-2 border-border pl-0 [counter-reset:step]">
+    <ol className="not-prose my-8 ml-0 list-none space-y-0 border-l-2 border-accent/30 pl-0 [counter-reset:step]">
       {children}
     </ol>
   );
@@ -15,9 +15,9 @@ export function Step({ title, children }: { title: string; children: ReactNode }
     <li className="relative pb-10 pl-10 last:pb-2 [counter-increment:step]">
       <span
         aria-hidden
-        className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-accent bg-background font-mono text-sm font-semibold text-accent before:content-[counter(step)]"
+        className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent font-mono text-sm font-bold text-white shadow-md ring-4 ring-background before:content-[counter(step)]"
       />
-      <h3 id={id} className="group mb-3 mt-1 scroll-mt-24 text-lg font-semibold tracking-tight">
+      <h3 id={id} className="group mb-3 mt-1 scroll-mt-24 text-xl font-bold tracking-tight text-navy">
         {title}
         <a
           href={`#${id}`}
