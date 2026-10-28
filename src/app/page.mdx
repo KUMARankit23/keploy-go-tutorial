@@ -476,7 +476,9 @@ A full report of every run, including the field-by-field comparison for each tes
 
 ## Things that tripped me up
 
-Notes from running this on a Windows 11 laptop, first through Docker Desktop and then again from WSL2. Each of these cost me more time than the actual tutorial did.
+Here's the honest ledger. Keploy itself got maybe ten minutes of my evening: install, record, two curls, test, green. The other two hours went to everything around it. Docker Desktop wouldn't boot. Defender ate the Windows binary. The install script quietly started shipping a different product than the one the docs describe, and the error that told me so was accurate but gave no hint that it was new behaviour. None of that is unusual. In my experience the tool is rarely the hard part of adopting a tool; the environment is, and a tutorial that only shows the happy path is a tutorial that gets abandoned at the first stack trace. So the notes below are the parts I'd want a colleague to have before they start, in the order I hit them.
+
+What made it worth it was a single moment. On the first `keploy test`, the Gin container came up, MongoDB sat idle, and both tests passed against mocks I'd never written. I've spent real weeks of my life hand-maintaining fixtures for exactly that kind of handler. That run is the demo I'd put in front of a sceptical teammate.
 
 <Callout type="warning" title="Docker Desktop refused to start">
   After an unclean shutdown, Docker Desktop kept dying with "The file cannot be accessed by the system" pointing at a `.sock` file under `%LOCALAPPDATA%\Docker\run`. Those are stale Unix-socket entries that Windows cannot delete normally. Renaming the whole `run` folder (and later `%LOCALAPPDATA%\docker-secrets-engine`) and relaunching fixed it. Killing Docker Desktop from Task Manager recreates the problem, so always quit it from the tray icon or with `docker desktop restart`. Not a Keploy problem, but you cannot start the tutorial without an engine.
