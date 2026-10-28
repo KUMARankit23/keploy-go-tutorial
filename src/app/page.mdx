@@ -1,0 +1,503 @@
+<Hero
+  eyebrow="Keploy quickstart · Go · Gin + MongoDB"
+  title="Record and replay API tests for a Go app with Keploy"
+  description="Turn real HTTP traffic from a Gin + MongoDB service into repeatable tests and database mocks, without writing a single test file. This walkthrough follows exactly what I did on a Windows 11 laptop, including the parts that tripped me up."
+/>
+
+<article className="prose-doc">
+
+## What you will build
+
+By the end of this tutorial you will have taken a small Go URL shortener (Gin for HTTP, MongoDB for storage), pointed Keploy at it, made two API calls, and ended up with:
+
+<Cards>
+  <Card title="Two test cases" icon="🧪">
+    YAML files that capture the exact request and response of each API call you made, replayable with one command.
+  </Card>
+  <Card title="MongoDB mocks" icon="🗄️">
+    The wire-level conversation between your app and Mongo, so tests run without touching a real database.
+  </Card>
+  <Card title="A green test run" icon="✅">
+    Plus one failure I triggered on purpose, so you know what a diff looks like and how to fix it.
+  </Card>
+  <Card title="A mental model" icon="🧠">
+    A clear picture of what Keploy is doing under the hood, so the flags stop looking like magic.
+  </Card>
+</Cards>
+
+## Why would a Go developer want this?
+
+If you have ever written an integration test for a handler that talks to a database, you know the ritual: spin up a container, seed data, write fixtures, assert on JSON, and then keep all of it in sync as the API evolves. Mocking the database layer by hand is faster, but the mocks drift away from what the real database actually returns.
+
+Keploy takes a different approach. Instead of asking you to *describe* what your service does, it **watches your service do it**. You run the app, hit it with real requests, and Keploy records both the HTTP traffic and every outbound call the app makes (to MongoDB in our case). Later it replays the requests and serves the recorded database responses back to your app, so the test is deterministic and needs no running Mongo.
+
+<Callout type="info" title="One sentence version">
+  Keploy is a proxy that records what goes *into* and *out of* your app once, then replays it as a test suite forever.
+</Callout>
+
+## How it works
+
+The diagram below is the thing I wish I had seen before I ran my first command. Keploy injects itself between your process and the network using eBPF (on Linux) and attaches to your app's container through a shared network namespace, so **your Go code does not change at all**. No SDK, no import, no build tags.
+
+<RecordReplayDiagram />
+
+Two modes, two commands:
+
+| Mode | Command | What Keploy does |
+| --- | --- | --- |
+| Record | `keploy record -c "<how to start your app>"` | Starts your app, captures each incoming HTTP call as a *test case* and each outgoing dependency call as a *mock*. |
+| Test | `keploy test -c "<how to start your app>"` | Starts your app again, replays each recorded request, serves the recorded mocks instead of the real DB, and diffs the response. |
+
+The `-c` flag is the whole trick: you hand Keploy the command you would normally use to run your app, and it runs it for you inside its recording harness.
+
+## Prerequisites
+
+<Cards>
+  <Card title="Docker Desktop (or Docker Engine)" icon="🐳">
+    We will run both MongoDB and the Go app in containers. I used Docker Desktop 4.74 on Windows 11 with the WSL2 backend.
+  </Card>
+  <Card title="A terminal with curl" icon="⌨️">
+    curl is how we generate traffic. Postman or Hoppscotch work just as well.
+  </Card>
+  <Card title="Linux, macOS, or Windows" icon="💻">
+    Keploy runs natively on Linux and macOS. On Windows, WSL2 with Ubuntu is the path of least resistance (details below).
+  </Card>
+  <Card title="Go 1.22+ (optional)" icon="🐹">
+    Only needed if you choose to run the app outside Docker. The Docker path builds the binary for you.
+  </Card>
+</Cards>
+
+<Callout type="warning" title="Windows users, read this first">
+  Keploy needs eBPF, which means a Linux kernel. On Windows that means either **WSL2** or letting Keploy drive **Docker Desktop**. I tried the native Windows installer first and Windows Defender quarantined the downloaded binary, so I would not plan on fighting that. Install Ubuntu in WSL2 (`wsl --install -d Ubuntu-22.04` from an admin PowerShell) and do everything below inside that Ubuntu terminal. Docker Desktop shares its engine with WSL2 automatically.
+</Callout>
+
+## Step by step
+
+<Steps>
+
+<Step title="Install Keploy">
+
+Pick the tab that matches your machine. On Linux, WSL2 and macOS it is a single script that drops a `keploy` binary into your PATH.
+
+<Tabs>
+<Tab label="Linux / WSL2">
+
+```bash
+curl --silent -O -L https://keploy.io/install.sh && source install.sh
+```
+
+Your kernel needs to be **5.10 or newer** for the eBPF hooks. Check with `uname -r`.
+
+</Tab>
+<Tab label="macOS">
+
+```bash
+curl --silent -O -L https://keploy.io/install.sh && source install.sh
+```
+
+Keploy runs natively on Apple Silicon. For the Docker path, Docker Desktop must be 4.25.2 or newer.
+
+</Tab>
+<Tab label="Windows (native)">
+
+```powershell
+$dir = "$env:USERPROFILE\.keploy\bin"
+New-Item -ItemType Directory -Force $dir | Out-Null
+Invoke-WebRequest -Uri "https://keploy.io/ent/dl/latest/enterprise_windows_amd64.exe" -OutFile "$dir\keploy.exe"
+Unblock-File "$dir\keploy.exe"
+[Environment]::SetEnvironmentVariable("Path", [Environment]::GetEnvironmentVariable("Path","User") + ";$dir", "User")
+```
+
+This installs the Windows CLI, which starts your containers through Docker Desktop. Open a new terminal afterwards. If Defender blocks the download, fall back to the WSL2 tab.
+
+</Tab>
+</Tabs>
+
+Verify the install. I was on 3.6.171, and the output below assumes a 3.x release:
+
+```bash
+keploy --version
+```
+
+</Step>
+
+<Step title="Grab the sample app and understand it">
+
+Keploy maintains a repo of sample apps. We want `gin-mongo`:
+
+```bash
+git clone https://github.com/keploy/samples-go.git
+cd samples-go/gin-mongo
+```
+
+Before running anything, it is worth 60 seconds to see what the app does. It is a URL shortener with three routes, all in `main.go` and `handler.go`:
+
+```go title="main.go (excerpt)" {3-5}
+r := gin.Default()
+
+r.GET("/:param", getURL)          // redirect a short code to its long URL
+r.POST("/url", putURL)            // create a short code for a URL
+r.GET("/verify-email", verifyEmail)
+```
+
+`putURL` hashes the long URL, upserts a document into the `url-shortener` collection, and responds with the short link plus a timestamp:
+
+```go title="handler.go (excerpt)" {4}
+c.JSON(http.StatusOK, gin.H{
+    "ts":  time.Now().UnixNano(),
+    "url": "http://localhost:8080/" + id,
+})
+```
+
+Keep that `ts` field in mind. It changes on every call, and later we will use it to see what a failing Keploy test looks like.
+
+<Callout type="tip" title="Where does the app find Mongo?">
+  Line 21 of `main.go` connects to `mongoDb:27017`. That hostname only resolves inside the Docker network defined in `docker-compose.yaml`. If you run the Go binary directly on your machine instead, change it to `localhost:27017`.
+</Callout>
+
+</Step>
+
+<Step title="Create the Docker network">
+
+The compose file declares `keploy-network` as an **external** network, meaning Docker expects it to already exist. This is the first thing that bit me: `docker compose up` fails with "network keploy-network declared as external, but could not be found" until you create it once:
+
+```bash
+docker network create keploy-network
+```
+
+Why a shared network? Keploy's agent container needs to sit on the same network as your app so it can intercept the app's calls to `mongoDb:27017`.
+
+</Step>
+
+<Step title="Record test cases">
+
+Now the fun part. Instead of `docker compose up`, you wrap that command in `keploy record`:
+
+<Tabs>
+<Tab label="Docker Compose (recommended)">
+
+```bash
+keploy record -c "docker compose up" --container-name "ginMongoApp" --build-delay 60
+```
+
+- `-c "docker compose up"` is the command Keploy runs to start your stack.
+- `--container-name "ginMongoApp"` tells Keploy which container is *your app* (it matches `container_name` in `docker-compose.yaml`), so it knows whose traffic to record and whose outbound calls to mock.
+- `--build-delay 60` gives the first `docker compose up` a minute to build the Go image before Keploy expects the app to be up. Drop it on later runs.
+
+</Tab>
+<Tab label="Native Go binary">
+
+Start only Mongo in Docker, then let Keploy run the Go process directly:
+
+```bash
+docker compose up mongo
+```
+
+```bash
+keploy record -c "go run main.go handler.go"
+```
+
+Remember to switch the Mongo host to `localhost:27017` in `main.go` first. On macOS, build first and pass the binary (`keploy record -c "./test-app-url-shortener"`) because `go run` spawns a child process Keploy cannot follow.
+
+</Tab>
+</Tabs>
+
+Keploy rewrites your compose file into a temporary one that adds its own `keploy-agent` service, starts everything, and waits for the agent to report healthy. Then your app's normal Gin logs appear. This is what my terminal looked like once it was ready:
+
+<Terminal title="keploy record">{`
+🐰 Keploy: INFO  Running application using a temporary Keploy-generated Docker Compose file (will be cleaned up automatically)
+🐰 Keploy: INFO  Waiting for keploy-agent to be ready for docker compose...
+keploy-v3-85be  | 🐰 Keploy(agent): INFO  Proxy started at port:16789
+keploy-v3-85be  | 🐰 Keploy(agent): INFO  Keploy has taken control of the DNS resolution mechanism
+🐰 Keploy: INFO  Keploy agent is ready to record test cases and mocks.
+ginMongoApp     | [GIN-debug] GET    /:param  --> main.getURL (3 handlers)
+ginMongoApp     | [GIN-debug] POST   /url     --> main.putURL (3 handlers)
+`}</Terminal>
+
+<Callout type="info" title="What just happened?">
+  Keploy generated a `docker-compose-tmp.yaml`, started MongoDB, the agent and your app, and the app is now sharing the agent's network namespace so every byte in and out passes through the proxy. Nothing has been written to `keploy/` yet, because no request has arrived. Leave this terminal open.
+</Callout>
+
+</Step>
+
+<Step title="Generate some traffic">
+
+Open a **second terminal** and make the two calls the app supports. First, shorten a URL:
+
+```bash
+curl --request POST \
+  --url http://localhost:8080/url \
+  --header 'content-type: application/json' \
+  --data '{ "url": "https://google.com" }'
+```
+
+```json title="response"
+{ "ts": 1793221298451137834, "url": "http://localhost:8080/Lhr4BWAi" }
+```
+
+Then resolve the short code you got back (yours will be `Lhr4BWAi` too, since the code is a deterministic hash of the input URL):
+
+```bash
+curl -i --request GET --url http://localhost:8080/Lhr4BWAi
+```
+
+```http title="response"
+HTTP/1.1 303 See Other
+Content-Type: text/html; charset=utf-8
+Location: https://google.com
+```
+
+Switch back to the Keploy terminal. Each call produced a log line like this:
+
+<Terminal title="keploy record">{`
+🐰 Keploy: INFO  🟠 Keploy has captured test cases for the user's application.  {"path": ".../gin-mongo/keploy/test-set-0/tests", "testcase name": "post-url-1"}
+🐰 Keploy: INFO  🟠 Keploy has captured test cases for the user's application.  {"path": ".../gin-mongo/keploy/test-set-0/tests", "testcase name": "get-lhr4bwai-1"}
+`}</Terminal>
+
+Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the Keploy terminal to stop recording. Keploy waits for the agent to hand over everything it captured, then shuts the containers down for you.
+
+<Callout type="tip" title="Scripting the recording">
+  If you are recording from a script or CI job and cannot press Ctrl+C, add `--record-timer 150s` and Keploy stops itself when the timer runs out. That is how I captured the output on this page.
+</Callout>
+
+<Callout type="aha" title="The a-ha moment">
+  I did not install a Go SDK, add a middleware, or touch the Mongo driver. Keploy captured a **Mongo upsert**, a **Mongo find**, and even the **DNS lookup** for the `mongoDb` hostname, purely by watching bytes on the wire. The app is a black box, and Keploy sits at the kernel's network boundary.
+</Callout>
+
+</Step>
+
+<Step title="Inspect what Keploy generated">
+
+A new `keploy/` folder now lives next to your source, along with a `keploy.yml` config Keploy wrote for you from the flags you passed:
+
+<FileTree
+  tree={[
+    {
+      name: "keploy/",
+      children: [
+        {
+          name: "test-set-0/",
+          note: "one set per recording session",
+          children: [
+            {
+              name: "tests/",
+              children: [
+                { name: "post-url-1.yaml", note: "POST /url" },
+                { name: "get-lhr4bwai-1.yaml", note: "GET /Lhr4BWAi" },
+              ],
+            },
+            { name: "mocks.yaml", note: "9 mocks: 2 DNS, 7 MongoDB" },
+            { name: "mappings.yaml", note: "which mocks each test used (written after the first replay)" },
+          ],
+        },
+        { name: "reports/", note: "one folder per keploy test run" },
+      ],
+    },
+    { name: "keploy.yml", note: "generated config: app name, command, container name" },
+  ]}
+/>
+
+Test case names are descriptive by default (`post-url-1`, `get-lhr4bwai-1`), which is a nice touch when you have fifty of them. Open `post-url-1.yaml`. It is refreshingly readable: the request, the response, and an `assertions.noise` section that matters a lot:
+
+```yaml title="keploy/test-set-0/tests/post-url-1.yaml" {5-6,14-15,20-23}
+version: api.keploy.io/v1beta1
+kind: Http
+name: post-url-1
+spec:
+  req:
+    method: POST
+    url: http://localhost:8080/url
+    header:
+      Content-Type: application/json
+      Host: localhost:8080
+    body: '{ "url": "https://google.com" }'
+  resp:
+    status_code: 200
+    body: '{"ts":1793221298451137834,"url":"http://localhost:8080/Lhr4BWAi"}'
+    header:
+      Content-Type: application/json; charset=utf-8
+      Date: Wed, 28 Oct 2026 21:01:38 GMT
+  assertions:
+    noise:
+      body.ts: []
+      header.Date: []
+curl: |-
+  curl --request POST --url http://localhost:8080/url ...
+```
+
+Look at that `noise` block. Keploy already figured out, **at record time**, that `body.ts` and `header.Date` change between calls and should not be compared. It also stores a ready-to-paste `curl` command for every test, which is handy for reproducing a failure by hand.
+
+Now peek at `mocks.yaml`. Each document is one dependency round trip. The first two are DNS answers for `mongoDb`; the rest are MongoDB wire messages. Here is the upsert that `POST /url` triggered, trimmed down:
+
+```yaml title="keploy/test-set-0/mocks.yaml (excerpt)" {2,6-8}
+version: api.keploy.io/v1beta1
+kind: Mongo
+name: mock-7
+spec:
+    metadata:
+        operation: '{"sections":["{ SectionSingle msg: {\"update\":\"url-shortener\",\"$db\":\"keploy\"} }",
+                      "{ SectionSingle identifier: documents, msgs: [ {\"q\":{\"_id\":\"Lhr4BWAi\"},
+                      \"u\":{\"$set\":{\"url\":\"https://google.com\", ...}},\"upsert\":true} ] }"]}'
+    requests:
+        - header: { requestId: 8, Opcode: 2013 }
+    responses:
+        - header: { requestId: 12, responseTo: 8, Opcode: 2013 }
+          message:
+            sections:
+                - '{ SectionSingle msg: {"n":1,"upserted":[{"index":0,"_id":"Lhr4BWAi"}],"nModified":0,"ok":1.0} }'
+```
+
+<Callout type="tip" title="Mocks are editable">
+  These are plain YAML. Want to see how your handler behaves when Mongo returns zero documents, or a different `_id`? Edit the mock, rerun the tests. That is a surprisingly cheap way to cover error paths that are hard to trigger against a real database.
+</Callout>
+
+</Step>
+
+<Step title="Replay the tests">
+
+Same command shape, different verb. `--delay 10` tells Keploy to wait ten seconds after starting the app before it fires the first request, which gives the container time to boot:
+
+```bash
+keploy test -c "docker compose up" --container-name "ginMongoApp" --delay 10
+```
+
+Keploy loads the mocks into the agent, starts the app, probes it until it answers, replays `post-url-1` and `get-lhr4bwai-1`, and compares each live response to the recorded one. Here is my first run, unedited apart from trimming container noise:
+
+<Terminal title="keploy test">{`
+🐰 Keploy: INFO  Test Sets to be Replayed  {"testSets": ["test-set-0"]}
+🐰 Keploy: INFO  stored the mocks on the agent  {"mocks": 9, "encoding": "zstd", "took": "24.25ms"}
+ginMongoApp     | [GIN] 21:03:53 | 404 | OPTIONS  "/keploy/__readiness_probe__"
+🐰 Keploy: INFO  starting test for  {"test case": "post-url-1", "test set": "test-set-0"}
+ginMongoApp     | [GIN] 21:03:53 | 200 | POST     "/url"
+Testrun passed for testcase with id: "post-url-1"
+🐰 Keploy: INFO  result  {"testcase id": "post-url-1", "testset id": "test-set-0", "passed": "true"}
+🐰 Keploy: INFO  starting test for  {"test case": "get-lhr4bwai-1", "test set": "test-set-0"}
+ginMongoApp     | [GIN] 21:03:53 | 303 | GET      "/Lhr4BWAi"
+Testrun passed for testcase with id: "get-lhr4bwai-1"
+🐰 Keploy: INFO  result  {"testcase id": "get-lhr4bwai-1", "testset id": "test-set-0", "passed": "true"}
+
+ <=========================================>
+  COMPLETE TESTRUN SUMMARY.
+	Total tests: 2
+	Total test passed: 2
+	Total test failed: 0
+	Total time taken: "11.12 s"
+
+	Test Suite Name		Total Test	Passed		Failed		Time Taken
+	"test-set-0"		2		2		0		"11.12 s"
+ <=========================================>
+🐰 Keploy: INFO  stopping Keploy  {"reason": "replay completed successfully"}
+`}</Terminal>
+
+Two for two. Notice the `404` for `OPTIONS /keploy/__readiness_probe__` in the Gin log: that is Keploy checking the app is listening before it starts the replay, and the 404 is expected. The real MongoDB container was running, but the app never talked to it: every query was answered from `mocks.yaml`.
+
+<Callout type="aha" title="Wait, why did it pass?">
+  The sample's README and the official quickstart warn that the first replay fails because `ts` is a fresh timestamp on every call, and tell you to add `body.ts` to the noise list by hand. On Keploy 3.6 that step is gone: the recorder spotted the field as noise on its own. If you are following an older guide and expecting a failure here, this is why you did not get one.
+</Callout>
+
+</Step>
+
+<Step title="Break it on purpose, then fix it">
+
+Automatic noise detection is great until it misses a field, so it is worth seeing what a real failure looks like and how to fix it. Open `post-url-1.yaml`, delete the `body.ts: []` line under `noise`, and run `keploy test` again:
+
+<Terminal title="keploy test (ts no longer marked as noise)">{`
+🐰 Keploy: INFO  starting test for  {"test case": "post-url-1", "test set": "test-set-0"}
+Testrun failed for testcase with id: "post-url-1"
+--------------------------------------------------------------------
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                                     POST - URL - 1                                       │
+├─────────────────────────────────────────────┬────────────────────────────────────────────┤
+│                 EXPECT BODY                 │                ACTUAL BODY                 │
+│ {                                           │ {                                          │
+│   "ts": "1793221298451137800" ,             │   "ts": "1793221470440953900" ,            │
+│   url:http://localhost:8080/Lhr4BWAi        │   url:http://localhost:8080/Lhr4BWAi       │
+│ }                                           │ }                                          │
+└─────────────────────────────────────────────┴────────────────────────────────────────────┘
+🐰 Keploy: INFO  result  {"testcase id": "post-url-1", "testset id": "test-set-0", "passed": "false"}
+Testrun passed for testcase with id: "get-lhr4bwai-1"
+
+	Test Suite Name		Total Test	Passed		Failed		Time Taken	Failed Testcases
+	"test-set-0"		2		1		1		"11.12 s"	"post-url-1"
+`}</Terminal>
+
+That side-by-side table is the whole story: same URL, different timestamp. Nothing is wrong with the app; the field is simply non-deterministic. Put the line back and you are green again:
+
+```yaml title="keploy/test-set-0/tests/post-url-1.yaml" {4}
+  assertions:
+    noise:
+      header.Date: []
+      body.ts: []
+```
+
+The empty list means "ignore this field entirely". You can instead pass regular expressions in the list if you only want to tolerate certain shapes of value, for example `body.ts: ["^\\d+$"]`.
+
+<Callout type="tip" title="Set noise once, globally">
+  If a field like `ts` appears in many responses, do not edit every test file. Declare it in the generated `keploy.yml` under `test.globalNoise`:
+
+```yaml title="keploy.yml"
+test:
+  globalNoise:
+    global:
+      body:
+        "ts": []
+      header:
+        "Date": []
+```
+
+</Callout>
+
+A full report of every run, including the field-by-field comparison for each test, lands in `keploy/reports/test-run-N/test-set-0-report.yaml`. That file is what you would attach to a bug ticket.
+
+</Step>
+
+</Steps>
+
+## Things that tripped me up
+
+Honest notes from running this on a Windows 11 laptop. Each of these cost me more time than the actual tutorial.
+
+<Callout type="warning" title="Docker Desktop refused to start">
+  After an unclean shutdown, Docker Desktop kept dying with "The file cannot be accessed by the system" pointing at a `.sock` file under `%LOCALAPPDATA%\Docker\run`. Those are stale Unix-socket entries that Windows cannot delete normally. Renaming the whole `run` folder (and later `%LOCALAPPDATA%\docker-secrets-engine`) and relaunching fixed it. Not a Keploy problem, but you cannot start the tutorial without an engine.
+</Callout>
+
+<Callout type="warning" title="External network must exist">
+  `docker compose up` errors immediately if `keploy-network` is missing because the compose file marks it `external: true`. Create it once with `docker network create keploy-network`.
+</Callout>
+
+<Callout type="warning" title="Forgetting --container-name">
+  With compose there are two containers (app and Mongo). Without `--container-name`, Keploy does not know which one is the application and records nothing. The value must match `container_name` in the compose file exactly.
+</Callout>
+
+<Callout type="warning" title='"keploy-agent did not come up"'>
+  Keploy's CLI talks to its agent container over a port published on `localhost`. My first attempt failed with "keploy-agent did not become ready in time" because I had launched the CLI somewhere that could not see Docker Desktop's published ports. If you see this message, run the CLI from the same place you run `docker` (your WSL2 shell is fine) and check `docker ps` shows a healthy `keploy-v3-…` container.
+</Callout>
+
+<Callout type="info" title="Why --delay matters">
+  In test mode Keploy starts the app and begins probing it. The sample app sleeps two seconds on boot and then dials Mongo. If the first request lands before the server is listening, that test fails with a connection error. Ten seconds is generous; tune it down once you know your app's startup time.
+</Callout>
+
+## Quick reference
+
+| I want to | Command |
+| --- | --- |
+| Record traffic for a compose stack | `keploy record -c "docker compose up" --container-name "<app>"` |
+| Record traffic for a local Go binary | `keploy record -c "go run main.go handler.go"` |
+| Stop recording automatically | add `--record-timer 150s` |
+| Replay all recorded test sets | `keploy test -c "<start cmd>" --delay 10` |
+| Replay a single test set | `keploy test -c "<start cmd>" --testsets test-set-0` |
+| Wait for a Docker build before attaching | add `--build-delay 60` |
+| See every flag | `keploy record --help`, `keploy test --help` |
+
+## Where to go next
+
+- **Put it in CI.** The `keploy/` folder is meant to be committed. A GitHub Actions job that runs `keploy test` gives you integration coverage with no database service to provision, and `keploy record --generate-github-actions` writes the workflow file for you.
+- **Record from your real client.** Point your frontend or Postman collection at the recording app for a few minutes and you get a realistic regression suite from traffic you already have.
+- **Try the other dependencies.** Keploy understands Postgres, MySQL, Redis, gRPC and plain HTTP calls the same way it understood Mongo and DNS here. The [Keploy docs](https://keploy.io/docs/) list every supported protocol.
+- **Read the rest of the Go samples.** [keploy/samples-go](https://github.com/keploy/samples-go) has echo-sql, mux-mysql, gin-redis and more, all following the same record and test shape you just learned.
+
+<Callout type="aha" title="Takeaway">
+  Keploy does not replace unit tests. It replaces the *expensive* tests: the ones where you would otherwise stand up a database, write fixtures, and hand-assert JSON. Record once, commit the YAML, and your handlers are covered against real wire behavior.
+</Callout>
+
+</article>

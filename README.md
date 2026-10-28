@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Record and replay API tests for a Go app with Keploy
 
-## Getting Started
+A single-page, static documentation site built with **Next.js 16**, **MDX** and **Tailwind CSS v4**.
+It walks a developer who has never used Keploy through recording and replaying API tests for the
+`gin-mongo` sample from [keploy/samples-go](https://github.com/keploy/samples-go), based on actually
+running the quickstart on a Windows 11 machine with Docker Desktop.
 
-First, run the development server:
+Built for the Keploy DevRel candidate assignment.
+
+## What is in the page
+
+- Step-by-step walkthrough: install, clone, create the Docker network, `keploy record`, generate
+  traffic, inspect the generated YAML, `keploy test`, fix the noisy `ts` field, go green.
+- The "why" behind each step and a diagram of how Keploy sits between the app and MongoDB.
+- Honest notes on everything that went wrong along the way (stale Docker sockets, the external
+  network, `--container-name`, `--delay`).
+- A quick-reference table and pointers on where to go next.
+
+## Tech
+
+| Concern | Choice |
+| --- | --- |
+| Framework | Next.js 16 (App Router, static export of a single route) |
+| Content | `src/app/page.mdx` via `@next/mdx` |
+| Styling | Tailwind CSS v4 with CSS-variable design tokens |
+| Syntax highlighting | `rehype-pretty-code` + Shiki, dual light/dark themes |
+| Dark mode | `next-themes` with a header toggle, respects system preference |
+| Icons | `lucide-react` |
+
+Custom MDX components live in `src/components` and are registered in `src/mdx-components.tsx`:
+`Callout`, `Steps`/`Step`, `Tabs`/`Tab`, `Terminal`, `FileTree`, `Cards`/`Card`,
+`RecordReplayDiagram`, `Hero`, plus a copy button on every code block.
+
+## Run locally
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build   # production build (fully static)
+npm run start
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The site is deployed on Vercel. Any push to `main` redeploys it.
