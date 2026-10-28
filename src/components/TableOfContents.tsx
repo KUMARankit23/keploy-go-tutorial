@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { toc } from "@/content/toc";
 
+const OFFSET = 112; // sticky header + breathing room, in px
+
 export function TableOfContents() {
   const [active, setActive] = useState<string>(toc[0]?.id ?? "");
 
@@ -12,17 +14,33 @@ export function TableOfContents() {
       .map((h) => document.getElementById(h.id))
       .filter((n): n is HTMLElement => n !== null);
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
-        if (visible[0]) setActive(visible[0].target.id);
-      },
-      { rootMargin: "-80px 0px -70% 0px", threshold: [0, 1] }
-    );
-    nodes.forEach((n) => observer.observe(n));
-    return () => observer.disconnect();
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      // The active heading is the last one whose top has scrolled past the offset.
+      let current = nodes[0]?.id ?? "";
+      for (const n of nodes) {
+        if (n.getBoundingClientRect().top - OFFSET <= 0) current = n.id;
+        else break;
+      }
+      // At the very bottom of the page, highlight the last entry.
+      if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2) {
+        current = nodes[nodes.length - 1]?.id ?? current;
+      }
+      setActive(current);
+    };
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, []);
 
   return (
