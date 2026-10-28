@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
+  // The whole site is one prerendered page, so emit plain static files.
+  output: "export",
   pageExtensions: ["js", "jsx", "ts", "tsx", "md", "mdx"],
   turbopack: {
     rules: {

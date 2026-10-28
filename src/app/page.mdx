@@ -2,25 +2,29 @@
   eyebrow="Keploy quickstart · Go · Gin + MongoDB"
   title="Record and replay API tests for a Go app with Keploy"
   description="Turn real HTTP traffic from a Gin + MongoDB service into repeatable tests and database mocks, without writing a single test file. This walkthrough follows exactly what I did on a Windows 11 laptop, including the parts that tripped me up."
+  author="Ankit Kumar"
+  authorUrl="https://github.com/KUMARankit23"
+  date="2026-10-29"
+  verified="Verified with Keploy 3.6.171 and Go 1.22"
 />
 
 <article className="prose-doc">
 
 ## What you will build
 
-By the end of this tutorial you will have taken a small Go URL shortener (Gin for HTTP, MongoDB for storage), pointed Keploy at it, made two API calls, and ended up with:
+By the end of this tutorial you'll have taken a small Go URL shortener (Gin for HTTP, MongoDB for storage), pointed Keploy at it, made two API calls, and ended up with:
 
 <Cards>
-  <Card title="Two test cases" icon="🧪">
+  <Card title="Two test cases" icon="tests">
     YAML files that capture the exact request and response of each API call you made, replayable with one command.
   </Card>
-  <Card title="MongoDB mocks" icon="🗄️">
+  <Card title="MongoDB mocks" icon="mocks">
     The wire-level conversation between your app and Mongo, so tests run without touching a real database.
   </Card>
-  <Card title="A green test run" icon="✅">
+  <Card title="A green test run" icon="pass">
     Plus one failure I triggered on purpose, so you know what a diff looks like and how to fix it.
   </Card>
-  <Card title="A mental model" icon="🧠">
+  <Card title="A mental model" icon="model">
     A clear picture of what Keploy is doing under the hood, so the flags stop looking like magic.
   </Card>
 </Cards>
@@ -48,27 +52,27 @@ Two modes, two commands:
 | Record | `keploy record -c "<how to start your app>"` | Starts your app, captures each incoming HTTP call as a *test case* and each outgoing dependency call as a *mock*. |
 | Test | `keploy test -c "<how to start your app>"` | Starts your app again, replays each recorded request, serves the recorded mocks instead of the real DB, and diffs the response. |
 
-The `-c` flag is the whole trick: you hand Keploy the command you would normally use to run your app, and it runs it for you inside its recording harness.
+The `-c` flag is the whole trick: you hand Keploy the command you'd normally use to run your app, and it runs it for you inside its recording harness.
 
 ## Prerequisites
 
 <Cards>
-  <Card title="Docker Desktop (or Docker Engine)" icon="🐳">
+  <Card title="Docker Desktop (or Docker Engine)" icon="docker">
     We will run both MongoDB and the Go app in containers. I used Docker Desktop 4.74 on Windows 11 with the WSL2 backend.
   </Card>
-  <Card title="A terminal with curl" icon="⌨️">
+  <Card title="A terminal with curl" icon="terminal">
     curl is how we generate traffic. Postman or Hoppscotch work just as well.
   </Card>
-  <Card title="Linux, macOS, or Windows" icon="💻">
-    Keploy runs natively on Linux and macOS. On Windows, WSL2 with Ubuntu 22.04 is the path of least resistance (details below). I ran everything on this page both ways: from WSL2 and from a container.
+  <Card title="Linux, macOS, or Windows" icon="os">
+    Keploy runs natively on Linux and Apple Silicon Macs. On Windows, WSL2 with Ubuntu 22.04 is the path of least resistance (details below). I ran everything on this page twice: once through Docker Desktop on Windows, once from a plain Ubuntu shell in WSL2.
   </Card>
-  <Card title="Go 1.22+ (optional)" icon="🐹">
+  <Card title="Go 1.22+ (optional)" icon="go">
     Only needed if you choose to run the app outside Docker. The Docker path builds the binary for you.
   </Card>
 </Cards>
 
 <Callout type="warning" title="Windows users, read this first">
-  Keploy needs eBPF, which means a Linux kernel. On Windows that means **WSL2**. I tried the native Windows installer first and Windows Defender quarantined the downloaded binary, so I would not plan on fighting that. Install Ubuntu (`wsl --install -d Ubuntu-22.04` from PowerShell) and do everything below inside that Ubuntu terminal. For Docker inside Ubuntu you have two choices: tick Ubuntu-22.04 under Docker Desktop → Settings → Resources → WSL integration, or skip Docker Desktop and `apt install docker.io docker-compose-v2` inside Ubuntu. I verified this tutorial end to end the second way.
+  Keploy hooks your app's network calls at the kernel, and on Windows the only kernel it can do that in is **WSL2**. I tried the native Windows installer first and Windows Defender quarantined the downloaded binary, so I wouldn't plan on fighting that. Install Ubuntu (`wsl --install -d Ubuntu-22.04` from PowerShell) and do everything below inside that Ubuntu terminal. For Docker inside Ubuntu you have two choices: tick Ubuntu-22.04 under Docker Desktop → Settings → Resources → WSL integration, or skip Docker Desktop and `apt install docker.io docker-compose-v2` inside Ubuntu. I verified this tutorial end to end the second way.
 </Callout>
 
 ## Step by step
@@ -77,7 +81,7 @@ The `-c` flag is the whole trick: you hand Keploy the command you would normally
 
 <Step title="Install Keploy">
 
-Pick the tab that matches your machine. On Linux, WSL2 and macOS it is a single script that drops a `keploy` binary into your PATH.
+Pick the tab that matches your machine. On Linux, WSL2 and macOS it's a single script that drops a `keploy` binary into your PATH.
 
 <Tabs>
 <Tab label="Linux / WSL2">
@@ -147,17 +151,17 @@ git clone https://github.com/keploy/samples-go.git
 cd samples-go/gin-mongo
 ```
 
-Before running anything, it is worth 60 seconds to see what the app does. It is a URL shortener with three routes, all in `main.go` and `handler.go`:
+Before running anything, it's worth 60 seconds to see what the app does. It's a URL shortener. The routes are registered in `main.go` and their handlers live in `handler.go`:
 
 ```go title="main.go (excerpt)" {3-5}
 r := gin.Default()
 
 r.GET("/:param", getURL)          // redirect a short code to its long URL
 r.POST("/url", putURL)            // create a short code for a URL
-r.GET("/verify-email", verifyEmail)
+r.GET("/verify-email", verifyEmail) // calls an external email checker; we won't use it
 ```
 
-`putURL` hashes the long URL, upserts a document into the `url-shortener` collection, and responds with the short link plus a timestamp:
+We'll exercise the first two. `putURL` hashes the long URL, upserts a document into the `url-shortener` collection, and responds with the short link plus a timestamp:
 
 ```go title="handler.go (excerpt)" {4}
 c.JSON(http.StatusOK, gin.H{
@@ -166,10 +170,10 @@ c.JSON(http.StatusOK, gin.H{
 })
 ```
 
-Keep that `ts` field in mind. It changes on every call, and later we will use it to see what a failing Keploy test looks like.
+Keep that `ts` field in mind. It changes on every call, and later we'll use it to see what a failing Keploy test looks like.
 
 <Callout type="tip" title="Where does the app find Mongo?">
-  Line 21 of `main.go` connects to `mongoDb:27017`. That hostname only resolves inside the Docker network defined in `docker-compose.yaml`. If you run the Go binary directly on your machine instead, change it to `localhost:27017`.
+  The `New("mongoDb:27017", dbName)` call near the top of `main()` is where the app connects to Mongo. That hostname only resolves inside the Docker network defined in `docker-compose.yaml`. If you run the Go binary directly on your machine instead, change it to `localhost:27017`.
 </Callout>
 
 </Step>
@@ -204,7 +208,7 @@ keploy record -c "docker compose up" --container-name "ginMongoApp" --build-dela
 </Tab>
 <Tab label="Native Go binary">
 
-Start only Mongo in Docker, then let Keploy run the Go process directly:
+Start only Mongo in Docker (the compose file still needs the `keploy-network` from the previous step), then let Keploy run the Go process directly:
 
 ```bash
 docker compose up mongo
@@ -278,7 +282,7 @@ Press <kbd>Ctrl</kbd>+<kbd>C</kbd> in the Keploy terminal to stop recording. Kep
 </Callout>
 
 <Callout type="aha" title="The a-ha moment">
-  I did not install a Go SDK, add a middleware, or touch the Mongo driver. Keploy captured a **Mongo upsert**, a **Mongo find**, and even the **DNS lookup** for the `mongoDb` hostname, purely by watching bytes on the wire. The app is a black box, and Keploy sits at the kernel's network boundary.
+  I didn't install a Go SDK, add a middleware, or touch the Mongo driver. Keploy captured a **Mongo upsert**, a **Mongo find**, and even the **DNS lookup** for the `mongoDb` hostname, purely by watching bytes on the wire. The app is a black box, and Keploy sits at the kernel's network boundary.
 </Callout>
 
 </Step>
@@ -304,7 +308,7 @@ A new `keploy/` folder now lives next to your source, along with a `keploy.yml` 
               ],
             },
             { name: "mocks.yaml", note: "9 mocks: 2 DNS, 7 MongoDB" },
-            { name: "mappings.yaml", note: "which mocks each test used (written after the first replay)" },
+            { name: "mappings.yaml", note: "appears after your first keploy test: which mocks each test used" },
           ],
         },
         { name: "reports/", note: "one folder per keploy test run" },
@@ -314,7 +318,7 @@ A new `keploy/` folder now lives next to your source, along with a `keploy.yml` 
   ]}
 />
 
-Test case names are descriptive by default (`post-url-1`, `get-lhr4bwai-1`), which is a nice touch when you have fifty of them. Open `post-url-1.yaml`. It is refreshingly readable: the request, the response, and an `assertions.noise` section that matters a lot:
+Test case names are descriptive by default (`post-url-1`, `get-lhr4bwai-1`), which is a nice touch when you have fifty of them. Open `post-url-1.yaml`. It's refreshingly readable: the request, the response, and an `assertions.noise` section that matters a lot:
 
 ```yaml title="keploy/test-set-0/tests/post-url-1.yaml" {5-6,14-15,20-23}
 version: api.keploy.io/v1beta1
@@ -406,7 +410,7 @@ Testrun passed for testcase with id: "get-lhr4bwai-1"
 🐰 Keploy: INFO  stopping Keploy  {"reason": "replay completed successfully"}
 `}</Terminal>
 
-Two for two. Notice the `404` for `OPTIONS /keploy/__readiness_probe__` in the Gin log: that is Keploy checking the app is listening before it starts the replay, and the 404 is expected. The real MongoDB container was running, but the app never talked to it: every query was answered from `mocks.yaml`. I got the identical result from a plain Ubuntu 22.04 shell in WSL2 with Docker Engine installed from apt, so nothing here depends on Docker Desktop.
+Two for two. Notice the `404` for `OPTIONS /keploy/__readiness_probe__` in the Gin log: that's Keploy checking the app is listening before it starts the replay, and the 404 is expected. The real MongoDB container was running, but the app never talked to it: every query was answered from `mocks.yaml`. I got the identical result from a plain Ubuntu 22.04 shell in WSL2 with Docker Engine installed from apt, so nothing here depends on Docker Desktop.
 
 <Callout type="aha" title="Wait, why did it pass?">
   The sample's README and the official quickstart warn that the first replay fails because `ts` is a fresh timestamp on every call, and tell you to add `body.ts` to the noise list by hand. On Keploy 3.6 that step is gone: the recorder spotted the field as noise on its own. If you are following an older guide and expecting a failure here, this is why you did not get one.
@@ -416,7 +420,7 @@ Two for two. Notice the `404` for `OPTIONS /keploy/__readiness_probe__` in the G
 
 <Step title="Break it on purpose, then fix it">
 
-Automatic noise detection is great until it misses a field, so it is worth seeing what a real failure looks like and how to fix it. Open `post-url-1.yaml`, delete the `body.ts: []` line under `noise`, and run `keploy test` again:
+Automatic noise detection is great until it misses a field, so it's worth seeing what a real failure looks like and how to fix it. Open `post-url-1.yaml`, delete the `body.ts: []` line under `noise`, and run `keploy test` again:
 
 <Terminal title="keploy test (ts no longer marked as noise)">{`
 🐰 Keploy: INFO  starting test for  {"test case": "post-url-1", "test set": "test-set-0"}
@@ -438,7 +442,7 @@ Testrun passed for testcase with id: "get-lhr4bwai-1"
 	"test-set-0"		2		1		1		"11.12 s"	"post-url-1"
 `}</Terminal>
 
-That side-by-side table is the whole story: same URL, different timestamp. Nothing is wrong with the app; the field is simply non-deterministic. Put the line back and you are green again:
+Same URL, different timestamp. Nothing's wrong with the app; the field is simply non-deterministic. (Yes, both runs really took 11.12 s. The app's two-second boot sleep plus the ten-second `--delay` dominate, so the wall time barely moves.) Put the line back and you're green again:
 
 ```yaml title="keploy/test-set-0/tests/post-url-1.yaml" {4}
   assertions:
@@ -450,7 +454,7 @@ That side-by-side table is the whole story: same URL, different timestamp. Nothi
 The empty list means "ignore this field entirely". You can instead pass regular expressions in the list if you only want to tolerate certain shapes of value, for example `body.ts: ["^\\d+$"]`.
 
 <Callout type="tip" title="Set noise once, globally">
-  If a field like `ts` appears in many responses, do not edit every test file. Declare it in the generated `keploy.yml` under `test.globalNoise`:
+  If a field like `ts` appears in many responses, don't edit every test file. Declare it in the generated `keploy.yml` under `test.globalNoise`:
 
 ```yaml title="keploy.yml"
 test:
@@ -472,7 +476,7 @@ A full report of every run, including the field-by-field comparison for each tes
 
 ## Things that tripped me up
 
-Honest notes from running this on a Windows 11 laptop. Each of these cost me more time than the actual tutorial.
+Notes from running this on a Windows 11 laptop, first through Docker Desktop and then again from WSL2. Each of these cost me more time than the actual tutorial did.
 
 <Callout type="warning" title="Docker Desktop refused to start">
   After an unclean shutdown, Docker Desktop kept dying with "The file cannot be accessed by the system" pointing at a `.sock` file under `%LOCALAPPDATA%\Docker\run`. Those are stale Unix-socket entries that Windows cannot delete normally. Renaming the whole `run` folder (and later `%LOCALAPPDATA%\docker-secrets-engine`) and relaunching fixed it. Killing Docker Desktop from Task Manager recreates the problem, so always quit it from the tray icon or with `docker desktop restart`. Not a Keploy problem, but you cannot start the tutorial without an engine.
@@ -483,15 +487,15 @@ Honest notes from running this on a Windows 11 laptop. Each of these cost me mor
 </Callout>
 
 <Callout type="warning" title="Forgetting --container-name">
-  With compose there are two containers (app and Mongo). Without `--container-name`, Keploy does not know which one is the application and records nothing. The value must match `container_name` in the compose file exactly.
+  With compose there are two containers (app and Mongo). Without `--container-name`, Keploy doesn't know which one is the application and records nothing. The value must match `container_name` in the compose file exactly.
 </Callout>
 
-<Callout type="warning" title='"keploy-agent did not come up"'>
-  Keploy's CLI talks to its agent container over a port published on `localhost`. My first attempt failed with "keploy-agent did not become ready in time" because I had launched the CLI somewhere that could not see Docker Desktop's published ports. If you see this message, run the CLI from the same place you run `docker` (your WSL2 shell is fine) and check `docker ps` shows a healthy `keploy-v3-…` container.
+<Callout type="warning" title='"keploy-agent did not become ready in time"'>
+  Keploy's CLI talks to its agent container over a port published on `localhost`. My first attempt died with exactly that message because I had launched the CLI somewhere that could not see Docker Desktop's published ports. If you see this message, run the CLI from the same place you run `docker` (your WSL2 shell is fine) and check `docker ps` shows a healthy `keploy-v3-…` container.
 </Callout>
 
-<Callout type="info" title="First run inside WSL2 is slow, and that is fine">
-  On a fresh Ubuntu the first `keploy record` has to pull the Keploy agent image, pull MongoDB, and build the Go image before anything listens. On my laptop that took just over a minute, and Keploy kept printing "still waiting for the keploy agent" until it was done. That message is patience, not an error. Running `docker compose build` once beforehand makes later runs start in seconds.
+<Callout type="info" title="First run inside WSL2 is slow, and that's fine">
+  On a fresh Ubuntu the first `keploy record` has to pull the Keploy agent image, pull MongoDB, and build the Go image before anything listens. On my laptop that took just over a minute, and Keploy kept printing "still waiting for the keploy agent" until it was done. It's waiting, not failing. Running `docker compose build` once beforehand makes later runs start in seconds.
 </Callout>
 
 <Callout type="info" title="Why --delay matters">
@@ -506,9 +510,17 @@ Honest notes from running this on a Windows 11 laptop. Each of these cost me mor
 | Record traffic for a local Go binary | `keploy record -c "go run main.go handler.go"` |
 | Stop recording automatically | add `--record-timer 150s` |
 | Replay all recorded test sets | `keploy test -c "<start cmd>" --delay 10` |
-| Replay a single test set | `keploy test -c "<start cmd>" --testsets test-set-0` |
+| Replay a single test set | `keploy test -c "<start cmd>" --test-sets test-set-0` |
 | Wait for a Docker build before attaching | add `--build-delay 60` |
 | See every flag | `keploy record --help`, `keploy test --help` |
+
+## Feedback for the Keploy docs
+
+Three things I'd change in the official quickstart after going through it cold. I'm listing them here because the gaps are where a first-time user actually gets stuck.
+
+1. **Say up front that the installer now ships the 3.8 CLI and that it needs `keploy login`.** The quickstart still reads as if `keploy record` works straight after `install.sh`. It doesn't. One sentence, plus a pointer to the open-source build for people who want to try it offline, would save the first ten minutes.
+2. **Drop the "add `body.ts` to noise" step, or mark it as legacy.** Keploy 3.x already detects that field at record time. A reader who follows the current text goes looking for a failure that never happens and wonders what they did wrong.
+3. **Fix the flag name in `keploy test --help`.** The flag is `--test-sets`, but the help text's own example says `--testsets`. I copied the example into my first draft of this page and it was wrong.
 
 ## Where to go next
 
@@ -518,7 +530,7 @@ Honest notes from running this on a Windows 11 laptop. Each of these cost me mor
 - **Read the rest of the Go samples.** [keploy/samples-go](https://github.com/keploy/samples-go) has echo-sql, mux-mysql, gin-redis and more, all following the same record and test shape you just learned.
 
 <Callout type="aha" title="Takeaway">
-  Keploy does not replace unit tests. It replaces the *expensive* tests: the ones where you would otherwise stand up a database, write fixtures, and hand-assert JSON. Record once, commit the YAML, and your handlers are covered against real wire behavior.
+  Keploy doesn't replace unit tests. It replaces the *expensive* tests: the ones where you'd otherwise stand up a database, write fixtures, and hand-assert JSON. Record once, commit the YAML, and your handlers are covered against real wire behavior.
 </Callout>
 
 </article>

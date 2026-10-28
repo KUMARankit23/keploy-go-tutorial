@@ -5,6 +5,7 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { TableOfContents } from "@/components/TableOfContents";
+import { MobileToc } from "@/components/MobileToc";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,15 +17,25 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://keploy-go-tutorial-ruby.vercel.app";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "Record & Replay API Tests for a Go App with Keploy",
   description:
     "A beginner-friendly, step-by-step tutorial for generating API tests and mocks for a Gin + MongoDB Go service using Keploy's record and test modes.",
+  authors: [{ name: "Ankit Kumar", url: "https://github.com/KUMARankit23" }],
   openGraph: {
     title: "Record & Replay API Tests for a Go App with Keploy",
     description:
       "Generate tests and mocks for a Gin + MongoDB service from real traffic, with zero test code.",
     type: "article",
+    url: SITE_URL,
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Record and replay API tests for a Go app with Keploy" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    images: ["/og.png"],
   },
 };
 
@@ -44,7 +55,10 @@ export default function RootLayout({
           <Header />
           <div className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-12">
-              <main className="min-w-0 py-10 lg:py-14">{children}</main>
+              <main className="min-w-0 py-10 lg:py-14">
+                <MobileToc />
+                {children}
+              </main>
               <aside className="hidden lg:block">
                 <TableOfContents />
               </aside>

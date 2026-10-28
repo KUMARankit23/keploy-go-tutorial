@@ -1,6 +1,6 @@
 "use client";
 
-import { Children, isValidElement, useId, useState, type ReactNode } from "react";
+import { Children, isValidElement, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import clsx from "clsx";
 
 type TabProps = { label: string; children: ReactNode };
@@ -15,6 +15,21 @@ export function Tabs({ children, defaultIndex = 0 }: { children: ReactNode; defa
   );
   const [active, setActive] = useState(defaultIndex);
   const id = useId();
+  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
+
+  // Arrow keys, Home and End move between tabs, as the WAI-ARIA tabs pattern expects.
+  const onKeyDown = (e: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const last = tabs.length - 1;
+    let next: number | null = null;
+    if (e.key === "ArrowRight") next = i === last ? 0 : i + 1;
+    else if (e.key === "ArrowLeft") next = i === 0 ? last : i - 1;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = last;
+    if (next === null) return;
+    e.preventDefault();
+    setActive(next);
+    buttons.current[next]?.focus();
+  };
 
   return (
     <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card">
@@ -22,13 +37,18 @@ export function Tabs({ children, defaultIndex = 0 }: { children: ReactNode; defa
         {tabs.map((t, i) => (
           <button
             key={t.props.label}
+            ref={(el) => {
+              buttons.current[i] = el;
+            }}
             role="tab"
             id={`${id}-tab-${i}`}
             aria-selected={active === i}
             aria-controls={`${id}-panel-${i}`}
+            tabIndex={active === i ? 0 : -1}
             onClick={() => setActive(i)}
+            onKeyDown={(e) => onKeyDown(e, i)}
             className={clsx(
-              "whitespace-nowrap rounded-t-lg px-3.5 py-2 text-sm font-medium transition",
+              "whitespace-nowrap rounded-t-lg px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               active === i
                 ? "bg-card text-foreground shadow-[0_1px_0_0_var(--card)]"
                 : "text-muted-foreground hover:text-foreground"
