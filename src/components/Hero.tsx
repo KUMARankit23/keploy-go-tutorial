@@ -33,6 +33,7 @@ export function Hero({
 
   return (
     <div id="top" className="not-prose relative mb-14 animate-fade-up">
+      <div className="hero-glow" aria-hidden />
       <Image
         src="/bunny.png"
         alt=""

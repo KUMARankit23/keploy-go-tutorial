@@ -31,7 +31,7 @@ function Entry({ node, depth }: { node: Node; depth: number }) {
 
 export function FileTree({ tree }: { tree: Node[] }) {
   return (
-    <div className="not-prose my-6 rounded-xl border border-border bg-card p-4">
+    <div className="not-prose my-6 overflow-x-auto rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <ul>
         {tree.map((n) => (
           <Entry key={n.name} node={n} depth={0} />

@@ -37,7 +37,7 @@ function colorize(text: string) {
 export function Terminal({ title = "terminal", children }: { title?: string; children: string }) {
   const text = children.replace(/^\n+/, "").replace(/\n+$/, "");
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-[#0f131a] text-[13px] text-zinc-200 shadow-sm">
+    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-[#0f131a] text-[13px] text-zinc-200 shadow-[var(--shadow-card)]">
       <div className="flex items-center gap-2 border-b border-white/10 bg-white/5 px-4 py-2">
         <span className="h-3 w-3 rounded-full bg-rose-500/80" />
         <span className="h-3 w-3 rounded-full bg-amber-400/80" />

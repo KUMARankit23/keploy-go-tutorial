@@ -58,7 +58,7 @@ export function TableOfContents() {
                 "-ml-px block border-l-2 py-1 leading-snug transition",
                 h.level === 3 ? "pl-6 text-[13px]" : "pl-3",
                 active === h.id
-                  ? "border-accent font-medium text-accent"
+                  ? "border-accent font-semibold text-accent-text"
                   : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
               )}
             >

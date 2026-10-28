@@ -47,7 +47,7 @@ const components: MDXComponents = {
     return (
       <a
         href={href}
-        className="font-semibold text-accent underline decoration-accent/40 underline-offset-4 transition hover:decoration-accent"
+        className="font-semibold text-accent-text underline decoration-accent/50 underline-offset-4 transition hover:text-accent hover:decoration-accent"
         {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
         {...props}
       />

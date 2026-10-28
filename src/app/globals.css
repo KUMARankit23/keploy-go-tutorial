@@ -18,6 +18,8 @@
   --accent-hover: #f27d2c;
   --accent-foreground: #ffffff;
   --accent-soft: #fff1e4;
+  /* Darker orange for small text (links, labels) so it meets AA contrast on cream and white. */
+  --accent-text: #c2560a;
   --code-bg: #fffbf7;
   --header-bg: #f6f6f5;
   --navy: #0a053e;
@@ -38,6 +40,7 @@
   --accent-hover: #ff9d5c;
   --accent-foreground: #ffffff;
   --accent-soft: #2a180c;
+  --accent-text: #ffa263;
   --code-bg: #0f0e13;
   --header-bg: #0b0a0b;
   --navy: #f3f1f7;
@@ -58,6 +61,7 @@
   --color-accent-hover: var(--accent-hover);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
   --color-code-bg: var(--code-bg);
   --color-navy: var(--navy);
   --color-header: var(--header-bg);
@@ -89,6 +93,71 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+/* Keyboard focus is always visible, in brand orange, on every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+::selection {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* Soft warm glow behind the hero, like the page background in the design. */
+.hero-glow {
+  position: absolute;
+  inset: -4rem -2rem auto -2rem;
+  height: 28rem;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(40rem 18rem at 15% 0%, rgba(255, 141, 63, 0.16), transparent 70%),
+    radial-gradient(28rem 14rem at 85% 20%, rgba(139, 92, 246, 0.1), transparent 70%);
+}
+.dark .hero-glow {
+  background:
+    radial-gradient(40rem 18rem at 15% 0%, rgba(255, 141, 63, 0.14), transparent 70%),
+    radial-gradient(28rem 14rem at 85% 20%, rgba(139, 92, 246, 0.12), transparent 70%);
+}
+
+/* Skip link: hidden until focused. */
+.skip-link {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 100;
+  border-radius: 0.5rem;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 1rem;
+}
+
+@media print {
+  header,
+  footer,
+  aside,
+  details,
+  .skip-link,
+  .back-to-top {
+    display: none !important;
+  }
+  body {
+    background: #ffffff;
+    color: #000000;
+  }
+  figure[data-rehype-pretty-code-figure] {
+    box-shadow: none;
+    break-inside: avoid;
+  }
 }
 
 /* Brand card: white surface, soft shadow, orange base line (as in the design's stat and testimonial cards). */

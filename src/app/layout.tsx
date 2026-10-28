@@ -6,6 +6,7 @@ import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { TableOfContents } from "@/components/TableOfContents";
 import { MobileToc } from "@/components/MobileToc";
+import { BackToTop } from "@/components/BackToTop";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -52,10 +53,13 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <a href="#main" className="skip-link">
+            Skip to content
+          </a>
           <Header />
           <div className="mx-auto w-full max-w-7xl flex-1 px-4 sm:px-6 lg:px-8">
             <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_16rem] lg:gap-12">
-              <main className="min-w-0 py-10 lg:py-14">
+              <main id="main" className="min-w-0 py-10 lg:py-14">
                 <MobileToc />
                 {children}
               </main>
@@ -65,6 +69,7 @@ export default function RootLayout({
             </div>
           </div>
           <Footer />
+          <BackToTop />
         </ThemeProvider>
       </body>
     </html>

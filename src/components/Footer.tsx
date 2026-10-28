@@ -29,7 +29,7 @@ export function Footer() {
                 rel="noreferrer"
                 aria-label={label}
                 title={label}
-                className="flex h-12 w-12 items-center justify-center rounded-lg bg-social text-white transition hover:bg-accent"
+                className="flex h-12 w-12 items-center justify-center rounded-lg bg-social text-white transition hover:-translate-y-0.5 hover:bg-accent focus-visible:outline-white"
               >
                 <Icon className="h-5 w-5" />
               </a>
