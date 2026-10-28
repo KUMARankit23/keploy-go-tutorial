@@ -1,5 +1,6 @@
 import Image from "next/image";
 import { ThemeToggle } from "./ThemeToggle";
+import { ReadingProgress } from "./ReadingProgress";
 
 const REPO_URL = process.env.NEXT_PUBLIC_REPO_URL ?? "https://github.com/KUMARankit23/keploy-go-tutorial";
 
@@ -42,6 +43,7 @@ export function Header() {
           </a>
         </nav>
       </div>
+      <ReadingProgress />
     </header>
   );
 }
