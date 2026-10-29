@@ -27,6 +27,7 @@
   --footer-fg: #c9cbe0;
   --social: #1c233c;
   --shadow-card: 0 6px 18px rgba(10, 5, 62, 0.06);
+  --shadow-card-hover: 0 14px 30px rgba(10, 5, 62, 0.12);
 }
 
 .dark {
@@ -48,6 +49,7 @@
   --footer-fg: #c9cbe0;
   --social: #1c233c;
   --shadow-card: 0 6px 18px rgba(0, 0, 0, 0.45);
+  --shadow-card-hover: 0 14px 30px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -167,6 +169,52 @@ body {
   border-bottom: 3px solid var(--accent);
   border-radius: 0.75rem;
   box-shadow: var(--shadow-card);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.brand-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--accent);
+}
+
+/* Hover feedback shared by the boxed blocks: callouts, tabs, file tree, terminal, code figures. */
+.hover-lift {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+figure[data-rehype-pretty-code-figure] {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+figure[data-rehype-pretty-code-figure]:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+}
+
+/* Links in the article: the underline thickens and turns orange on hover. */
+.prose-doc a:not(.heading-anchor):not(.btn-primary):not(.btn-outline) {
+  transition: color 0.15s ease, text-decoration-color 0.15s ease, text-decoration-thickness 0.15s ease;
+}
+.prose-doc a:not(.heading-anchor):not(.btn-primary):not(.btn-outline):hover {
+  text-decoration-thickness: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brand-card,
+  .hover-lift,
+  .btn-primary,
+  .btn-outline,
+  .back-to-top {
+    transition: none;
+  }
+  .brand-card:hover,
+  .hover-lift:hover,
+  .btn-primary:hover {
+    transform: none;
+  }
 }
 
 /* Buttons */
@@ -194,10 +242,12 @@ body {
   color: var(--accent);
   padding: calc(0.75rem - 2px) 1.5rem;
   font-weight: 600;
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
 }
 .btn-outline:hover {
-  background: var(--accent-soft);
+  background: var(--accent);
+  color: #ffffff;
+  transform: translateY(-1px);
 }
 
 /* ---------- Shiki / rehype-pretty-code ---------- */

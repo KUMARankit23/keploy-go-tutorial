@@ -7,7 +7,7 @@ function Entry({ node, depth }: { node: Node; depth: number }) {
   return (
     <li>
       <div
-        className="flex items-center gap-2 py-0.5 font-mono text-[13px]"
+        className="flex items-center gap-2 rounded-md py-0.5 font-mono text-[13px] transition-colors hover:bg-accent-soft"
         style={{ paddingLeft: `${depth * 1.25}rem` }}
       >
         {isDir ? (
@@ -31,7 +31,7 @@ function Entry({ node, depth }: { node: Node; depth: number }) {
 
 export function FileTree({ tree }: { tree: Node[] }) {
   return (
-    <div className="not-prose my-6 overflow-x-auto rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
+    <div className="not-prose hover-lift my-6 overflow-x-auto rounded-xl border border-border bg-card p-4 shadow-[var(--shadow-card)]">
       <ul>
         {tree.map((n) => (
           <Entry key={n.name} node={n} depth={0} />

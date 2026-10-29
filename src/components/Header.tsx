@@ -16,7 +16,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-header/90 backdrop-blur supports-[backdrop-filter]:bg-header/80">
       <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        <a href="#top" className="flex items-center gap-3">
+        <a href="#top" className="flex items-center gap-3 transition-opacity hover:opacity-80">
           <Image src="/keploy-logo.png" alt="Keploy" width={112} height={20} priority className="h-5 w-auto" />
           <span className="hidden h-5 w-px bg-border sm:block" aria-hidden />
           <span className="hidden text-sm font-semibold text-navy sm:block">Go quickstart tutorial</span>
@@ -26,7 +26,7 @@ export function Header() {
             href="https://keploy.io/docs/"
             target="_blank"
             rel="noreferrer"
-            className="hidden text-sm font-medium text-muted-foreground transition hover:text-accent md:inline-block"
+            className="hidden text-sm font-medium text-muted-foreground underline decoration-transparent underline-offset-4 transition hover:text-accent-text hover:decoration-accent md:inline-block"
           >
             Keploy Docs
           </a>
@@ -35,7 +35,7 @@ export function Header() {
             href={REPO_URL}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-accent-hover dark:bg-[#02011b] dark:hover:bg-[#1a1840]"
+            className="inline-flex h-10 items-center gap-2 rounded-lg bg-accent px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-accent-hover hover:shadow-md dark:bg-[#02011b] dark:hover:bg-[#1a1840]"
           >
             <GitHubIcon className="h-4 w-4" />
             <span className="hidden sm:inline">Source on GitHub</span>

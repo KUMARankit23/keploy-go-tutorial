@@ -21,10 +21,10 @@ export function Steps({ children }: { children: ReactNode }) {
 export function Step({ title, children }: { title: string; children: ReactNode }) {
   const id = slugify(title);
   return (
-    <li className="relative pb-10 pl-10 last:pb-2 [counter-increment:step]">
+    <li className="group/step relative pb-10 pl-10 last:pb-2 [counter-increment:step]">
       <span
         aria-hidden
-        className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent font-mono text-sm font-bold text-white shadow-md ring-4 ring-background before:content-[counter(step)]"
+        className="absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full bg-accent font-mono text-sm font-bold text-white shadow-md ring-4 ring-background transition-transform group-hover/step:scale-110 before:content-[counter(step)]"
       />
       <div className="mb-3 mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h3 id={id} className="group scroll-mt-24 text-xl font-bold tracking-tight text-navy">

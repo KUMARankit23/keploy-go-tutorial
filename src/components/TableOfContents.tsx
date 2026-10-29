@@ -64,7 +64,7 @@ export function TableOfContents() {
                   h.level === 3 ? "pl-6 text-[13px]" : "pl-3",
                   active === h.id
                     ? "border-accent font-semibold text-accent-text"
-                    : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
+                    : "border-transparent text-muted-foreground hover:translate-x-0.5 hover:border-accent/50 hover:text-accent-text"
                 )}
               >
                 {isDone && <Check className="h-3.5 w-3.5 shrink-0 text-accent" aria-label="done" />}

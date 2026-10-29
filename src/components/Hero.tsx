@@ -71,7 +71,7 @@ export function Hero({
               href={authorUrl}
               target="_blank"
               rel="noreferrer"
-              className="font-semibold text-navy underline decoration-border underline-offset-4 hover:decoration-accent"
+              className="font-semibold text-navy underline decoration-border underline-offset-4 transition-colors hover:text-accent-text hover:decoration-accent"
             >
               {author}
             </a>

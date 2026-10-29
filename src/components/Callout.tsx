@@ -55,7 +55,7 @@ export function Callout({
     <aside
       role="note"
       className={clsx(
-        "not-prose my-6 flex gap-3 rounded-xl border border-border border-l-4 p-4 text-[0.95rem] leading-relaxed shadow-[var(--shadow-card)]",
+        "not-prose hover-lift my-6 flex gap-3 rounded-xl border border-border border-l-4 p-4 text-[0.95rem] leading-relaxed shadow-[var(--shadow-card)]",
         c.box
       )}
     >

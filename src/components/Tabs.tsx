@@ -77,7 +77,7 @@ export function Tabs({ children, defaultIndex = 0 }: { children: ReactNode; defa
   const autoPicked = chosen === null && platformTab(labels, platform) !== null;
 
   return (
-    <div className="not-prose my-6 overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
+    <div className="not-prose hover-lift my-6 overflow-hidden rounded-xl border border-border bg-card shadow-[var(--shadow-card)]">
       <div role="tablist" className="flex items-center gap-1 overflow-x-auto border-b border-border bg-muted px-2 pt-2 [scrollbar-width:thin]">
         {tabs.map((t, i) => (
           <button
@@ -96,7 +96,7 @@ export function Tabs({ children, defaultIndex = 0 }: { children: ReactNode; defa
               "whitespace-nowrap rounded-t-lg border-b-2 px-3.5 py-2 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               active === i
                 ? "border-accent bg-card text-accent-text shadow-[0_1px_0_0_var(--card)]"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:border-accent/40 hover:bg-card/60 hover:text-foreground"
             )}
           >
             {t.props.label}

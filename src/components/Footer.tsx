@@ -40,7 +40,7 @@ export function Footer() {
         <p className="mt-10 text-xs text-footer-fg/70">
           Not affiliated with Keploy. Sample app from{" "}
           <a
-            className="underline decoration-footer-fg/40 underline-offset-4 hover:text-white"
+            className="underline decoration-footer-fg/40 underline-offset-4 transition-colors hover:text-accent hover:decoration-accent"
             href="https://github.com/keploy/samples-go/tree/main/gin-mongo"
             target="_blank"
             rel="noreferrer"
